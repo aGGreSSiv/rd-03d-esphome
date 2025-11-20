@@ -1,54 +1,69 @@
 esphome:
-  name: rd03d-sensor
-  platform: ESP32
-  board: esp32dev
+  name: rd-03d-sensor-test
+  friendly_name: RD-03D Sensor Test
   on_boot:
     priority: -100
     then:
       # Single target detection mode komutu gönder
       - uart.write:
-          id: uart_bus
+          id: uart_rd03d
           data: [0xFD, 0xFC, 0xFB, 0xFA, 0x02, 0x00, 0x80, 0x00, 0x04, 0x03, 0x02, 0x01]
       - delay: 200ms
-      - logger.log: "RD-03D Single Target Detection Mode Activated"
+      - logger.log: 
+          format: "RD-03D initialized - Single Target Detection Mode activated"
+          level: INFO
 
-# WiFi ayarları
-wifi:
-  ssid: "WiFi_SSID_BURAYA"
-  password: "WiFi_SIFRE_BURAYA"
-  
-  # Bağlantı hatası durumunda hotspot aç
-  ap:
-    ssid: "RD03D Fallback Hotspot"
-    password: "12345678"
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: arduino
 
-# Home Assistant API
-api:
-  encryption:
-    key: "API_KEY_BURAYA"  # esphome logs ile otomatik oluşacak
-
-# OTA güncellemeler
-ota:
-  password: "OTA_PASSWORD_BURAYA"
-
-# Logger ayarları
+# Enable logging - USB Serial kullanıyoruz (GPIO43/44 USB pinleri)
 logger:
   level: DEBUG
-  baud_rate: 0  # UART kullanıldığı için logger'ı UART'tan ayır
+  # baud_rate kaldırdık, varsayılan USB Serial kullanacak
 
-# UART ayarları - RD-03D için
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "Nqcibr4vt4DDkcugFdC8eJVf7XTLbba7GVQsKWZzooE="
+
+ota:
+  - platform: esphome
+    password: "8a086dec211ee67b0ab080c26c3b6796"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Rd-03D-Sensor-Test"
+    password: "vL6oI5g9csXi"
+
+captive_portal:
+
+# UART Configuration for RD-03D
 uart:
-  id: uart_bus
-  tx_pin: GPIO17
-  rx_pin: GPIO16
+  id: uart_rd03d
+  tx_pin: GPIO43  # ESP32-S3 → RD-03D RXD
+  rx_pin: GPIO44  # ESP32-S3 ← RD-03D TXD
   baud_rate: 256000
   rx_buffer_size: 256
+  debug:
+    direction: BOTH  # HER İKİ YÖNÜ DE GÖSTER - ÖNEMLİ!
+    dummy_receiver: true
+    after:
+      delimiter: [0x55, 0xCC]  # Frame sonu
+    sequence:
+      - lambda: |-
+          UARTDebug::log_hex(direction, bytes, ':');
 
-# RD-03D Sensör Tanımlamaları
+# Sensörler
 sensor:
-  # Mesafe sensörü (cm)
+  # Mesafe sensörü (cm cinsinden)
   - platform: template
-    name: "RD03D Distance"
+    name: "Distance"
     id: rd03d_distance
     unit_of_measurement: "cm"
     accuracy_decimals: 1
@@ -56,111 +71,168 @@ sensor:
     device_class: "distance"
     state_class: "measurement"
     
-  # X koordinatı (mm)
+  # X koordinatı (mm cinsinden)
   - platform: template
-    name: "RD03D X Position"
+    name: "X Position"
     id: rd03d_x
     unit_of_measurement: "mm"
     accuracy_decimals: 0
     icon: "mdi:axis-x-arrow"
     state_class: "measurement"
     
-  # Y koordinatı (mm)
+  # Y koordinatı (mm cinsinden)
   - platform: template
-    name: "RD03D Y Position"
+    name: "Y Position"
     id: rd03d_y
     unit_of_measurement: "mm"
     accuracy_decimals: 0
     icon: "mdi:axis-y-arrow"
     state_class: "measurement"
     
-  # Açı (derece)
+  # Açı (derece cinsinden)
   - platform: template
-    name: "RD03D Angle"
+    name: "Angle"
     id: rd03d_angle
     unit_of_measurement: "°"
     accuracy_decimals: 1
     icon: "mdi:angle-acute"
     state_class: "measurement"
 
-  # Hız (cm/s)
+  # Hız (cm/s cinsinden)
   - platform: template
-    name: "RD03D Speed"
+    name: "Speed"
     id: rd03d_speed
     unit_of_measurement: "cm/s"
     accuracy_decimals: 0
     icon: "mdi:speedometer"
     state_class: "measurement"
+    
+  # Distance Resolution
+  - platform: template
+    name: "Distance Resolution"
+    id: rd03d_distance_res
+    unit_of_measurement: "mm"
+    accuracy_decimals: 0
+    icon: "mdi:ruler-square"
+    state_class: "measurement"
 
   # WiFi sinyal gücü
   - platform: wifi_signal
-    name: "RD03D WiFi Signal"
+    name: "WiFi Signal"
     update_interval: 60s
 
-# İkili sensörler
+  # Uptime
+  - platform: uptime
+    name: "Uptime"
+    update_interval: 60s
+
+# Binary sensörler
 binary_sensor:
   # Hedef algılama durumu
   - platform: template
-    name: "RD03D Target Detected"
+    name: "Target Detected"
     id: rd03d_target_detected
     device_class: "occupancy"
 
-# Text sensör - durum bilgisi
+# Text sensörler
 text_sensor:
+  # Durum bilgisi
   - platform: template
-    name: "RD03D Status"
+    name: "Status"
     id: rd03d_status
+    icon: "mdi:information-outline"
   
+  # ESPHome versiyonu
   - platform: version
-    name: "RD03D ESPHome Version"
+    name: "ESPHome Version"
+    
+  # WiFi bilgisi
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+    ssid:
+      name: "Connected SSID"
 
-# Custom component - UART'tan veri okuma
+# Ana döngü - UART'tan veri okuma ve parse etme
 interval:
   - interval: 50ms
     then:
       - lambda: |-
+          // Static değişkenler
           static uint8_t rx_buffer[64] = {0};
           static uint8_t rx_count = 0;
           static uint32_t last_valid_data = 0;
+          static uint32_t frame_count = 0;
+          static uint32_t error_count = 0;
+          static bool debug_mode = true;  // İlk 100 frame'de detaylı log
           
-          // UART'tan veri oku
-          while (id(uart_bus).available()) {
+          // UART'tan mevcut tüm verileri oku
+          while (id(uart_rd03d).available()) {
             uint8_t byte;
-            id(uart_bus).read_byte(&byte);
+            id(uart_rd03d).read_byte(&byte);
             
+            // Buffer'a ekle
             rx_buffer[rx_count++] = byte;
             
             // Buffer overflow kontrolü
             if (rx_count >= 64) {
+              ESP_LOGW("RD03D", "⚠️ Buffer overflow! Resetting... Count was: %d", rx_count);
               rx_count = 0;
               memset(rx_buffer, 0, 64);
+              error_count++;
               continue;
             }
             
             // Frame sonu kontrolü: 0x55 0xCC
-            if (rx_count >= 2 && rx_buffer[rx_count - 2] == 0x55 && rx_buffer[rx_count - 1] == 0xCC) {
+            if (rx_count >= 2 && 
+                rx_buffer[rx_count - 2] == 0x55 && 
+                rx_buffer[rx_count - 1] == 0xCC) {
               
-              // Frame uzunluğu kontrolü (32 byte olmalı)
-              if (rx_count >= 32) {
+              frame_count++;
+              
+              // İlk 20 frame'de veya her 100 frame'de raw data göster
+              if (frame_count <= 20 || frame_count % 100 == 0) {
+                ESP_LOGD("RD03D", "📦 Frame #%d, Size: %d bytes", frame_count, rx_count);
+                
+                // Raw hex data göster
+                std::string hex_str = "Raw: ";
+                for (int i = 0; i < rx_count && i < 32; i++) {
+                  char buf[8];
+                  sprintf(buf, "%02X ", rx_buffer[i]);
+                  hex_str += buf;
+                }
+                ESP_LOGD("RD03D", "%s", hex_str.c_str());
+              }
+              
+              // Frame uzunluğu kontrolü (minimum 30 byte: 4 header + 24 data + 2 tail)
+              if (rx_count >= 30) {
                 
                 // Header kontrolü: 0xAA 0xFF 0x03 0x00
-                if (rx_buffer[0] == 0xAA && rx_buffer[1] == 0xFF && 
-                    rx_buffer[2] == 0x03 && rx_buffer[3] == 0x00) {
+                if (rx_buffer[0] == 0xAA && 
+                    rx_buffer[1] == 0xFF && 
+                    rx_buffer[2] == 0x03 && 
+                    rx_buffer[3] == 0x00) {
                   
-                  // Target1 verilerini parse et
+                  // Target1 verilerini parse et (byte 4-11)
                   int16_t target_x = ((int16_t)(rx_buffer[4] | (rx_buffer[5] << 8))) - 0x200;
                   int16_t target_y = ((int16_t)(rx_buffer[6] | (rx_buffer[7] << 8))) - 0x8000;
                   int16_t target_speed = ((int16_t)(rx_buffer[8] | (rx_buffer[9] << 8))) - 0x10;
                   uint16_t target_distance_res = rx_buffer[10] | (rx_buffer[11] << 8);
                   
-                  // Mesafe hesapla (Pisagor teoremi)
+                  // Mesafe hesapla
                   float distance = sqrt(pow(target_x, 2) + pow(target_y, 2)) / 10.0;
                   
-                  // Açı hesapla (radyan -> derece)
-                  float angle = atan2(target_y, target_x) * 180.0 / 3.14159265;
+                  // Açı hesapla
+                  float angle = atan2(target_y, target_x) * 180.0 / 3.14159265359;
                   
-                  // Hedef algılandı mı kontrolü (mesafe > 0)
-                  bool target_detected = (distance > 0.5);
+                  // Hedef algılandı mı?
+                  bool target_detected = (distance > 0.5 && distance < 900);
+                  
+                  // İlk 20 frame'de veya her 100 frame'de parse edilmiş veriyi göster
+                  if (frame_count <= 20 || frame_count % 100 == 0) {
+                    ESP_LOGI("RD03D", "📊 Parsed - Distance: %.1f cm, Angle: %.1f°, X: %d mm, Y: %d mm, Speed: %d cm/s", 
+                             distance, angle, target_x, target_y, target_speed);
+                  }
                   
                   // Sensörleri güncelle
                   if (target_detected) {
@@ -169,18 +241,37 @@ interval:
                     id(rd03d_y).publish_state(target_y);
                     id(rd03d_angle).publish_state(angle);
                     id(rd03d_speed).publish_state(target_speed);
+                    id(rd03d_distance_res).publish_state(target_distance_res);
                     id(rd03d_target_detected).publish_state(true);
                     id(rd03d_status).publish_state("Target Detected");
+                    
                     last_valid_data = millis();
                     
-                    // Debug log
-                    ESP_LOGD("RD03D", "Distance: %.1f cm, Angle: %.1f°, X: %d mm, Y: %d mm", 
-                             distance, angle, target_x, target_y);
                   } else {
+                    // Hedef yok
                     id(rd03d_target_detected).publish_state(false);
                     id(rd03d_status).publish_state("No Target");
+                    
+                    // Sıfır değerleri yayınla
+                    id(rd03d_distance).publish_state(0);
+                    id(rd03d_x).publish_state(0);
+                    id(rd03d_y).publish_state(0);
+                    id(rd03d_angle).publish_state(0);
+                    id(rd03d_speed).publish_state(0);
+                    id(rd03d_distance_res).publish_state(0);
                   }
+                  
+                } else {
+                  // Header yanlış
+                  ESP_LOGW("RD03D", "❌ Invalid header: %02X %02X %02X %02X (expected: AA FF 03 00)", 
+                           rx_buffer[0], rx_buffer[1], rx_buffer[2], rx_buffer[3]);
+                  error_count++;
                 }
+                
+              } else {
+                // Frame çok kısa
+                ESP_LOGW("RD03D", "⚠️ Frame too short: %d bytes (minimum 30 expected)", rx_count);
+                error_count++;
               }
               
               // Buffer'ı sıfırla
@@ -189,8 +280,30 @@ interval:
             }
           }
           
-          // 5 saniye veri gelmezse "hedef yok" durumu
+          // Timeout kontrolü - 5 saniye veri gelmezse
           if (millis() - last_valid_data > 5000 && last_valid_data > 0) {
             id(rd03d_target_detected).publish_state(false);
-            id(rd03d_status).publish_state("No Data");
+            id(rd03d_status).publish_state("No Data - Check Connections");
+            ESP_LOGW("RD03D", "⚠️ No data for 5 seconds! Frames: %d, Errors: %d", frame_count, error_count);
           }
+          
+          // Her 10000 frame'de bir istatistik
+          if (frame_count % 10000 == 0 && frame_count > 0) {
+            ESP_LOGI("RD03D", "📈 Stats - Total: %d frames, Errors: %d (%.2f%%)", 
+                     frame_count, error_count, (error_count * 100.0) / frame_count);
+          }
+
+# Diagnostic button - sensörü yeniden başlat
+button:
+  - platform: restart
+    name: "Restart ESP32"
+    
+  - platform: template
+    name: "Reinitialize Sensor"
+    on_press:
+      - logger.log: "🔄 Reinitializing RD-03D sensor..."
+      - uart.write:
+          id: uart_rd03d
+          data: [0xFD, 0xFC, 0xFB, 0xFA, 0x02, 0x00, 0x80, 0x00, 0x04, 0x03, 0x02, 0x01]
+      - delay: 200ms
+      - logger.log: "✅ RD-03D reinitialized"
