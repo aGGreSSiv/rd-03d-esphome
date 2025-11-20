@@ -1,5 +1,7 @@
 # RD-03D mmWave Radar ESPHome Integration
 
+Attention: Since I'm not a programmer, this has been created with the help of artificial intelligence. I will try to answer your requests and questions for my own improvement, but you can also do this yourselves by using AI tools. I spent time getting this sensor to work because it doesn't have a proper Esphome file. Unfortunately, most of these sensor types are junk; most of them can't deliver what they promise in their datasheets, or they all have a finicky side. The one that has worked most flawlessly so far has been the LD2410B. The reason I want to replace it is the range; I needed more distance. At the end of the day, it might be necessary to switch to higher quality products with proper documentation behind them, like those from DFRobot or SeedStudio. Since these tests were done with products bought from the Chinese market, I may not have reached a happy ending. :)
+
 🎯 RD-03D 24GHz mmWave radar sensörünü ESPHome ile Home Assistant'a entegre edin!
 
 ## 🚀 Hızlı Başlangıç
