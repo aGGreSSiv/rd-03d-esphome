@@ -1,0 +1,196 @@
+esphome:
+  name: rd03d-sensor
+  platform: ESP32
+  board: esp32dev
+  on_boot:
+    priority: -100
+    then:
+      # Single target detection mode komutu gönder
+      - uart.write:
+          id: uart_bus
+          data: [0xFD, 0xFC, 0xFB, 0xFA, 0x02, 0x00, 0x80, 0x00, 0x04, 0x03, 0x02, 0x01]
+      - delay: 200ms
+      - logger.log: "RD-03D Single Target Detection Mode Activated"
+
+# WiFi ayarları
+wifi:
+  ssid: "WiFi_SSID_BURAYA"
+  password: "WiFi_SIFRE_BURAYA"
+  
+  # Bağlantı hatası durumunda hotspot aç
+  ap:
+    ssid: "RD03D Fallback Hotspot"
+    password: "12345678"
+
+# Home Assistant API
+api:
+  encryption:
+    key: "API_KEY_BURAYA"  # esphome logs ile otomatik oluşacak
+
+# OTA güncellemeler
+ota:
+  password: "OTA_PASSWORD_BURAYA"
+
+# Logger ayarları
+logger:
+  level: DEBUG
+  baud_rate: 0  # UART kullanıldığı için logger'ı UART'tan ayır
+
+# UART ayarları - RD-03D için
+uart:
+  id: uart_bus
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+  baud_rate: 256000
+  rx_buffer_size: 256
+
+# RD-03D Sensör Tanımlamaları
+sensor:
+  # Mesafe sensörü (cm)
+  - platform: template
+    name: "RD03D Distance"
+    id: rd03d_distance
+    unit_of_measurement: "cm"
+    accuracy_decimals: 1
+    icon: "mdi:ruler"
+    device_class: "distance"
+    state_class: "measurement"
+    
+  # X koordinatı (mm)
+  - platform: template
+    name: "RD03D X Position"
+    id: rd03d_x
+    unit_of_measurement: "mm"
+    accuracy_decimals: 0
+    icon: "mdi:axis-x-arrow"
+    state_class: "measurement"
+    
+  # Y koordinatı (mm)
+  - platform: template
+    name: "RD03D Y Position"
+    id: rd03d_y
+    unit_of_measurement: "mm"
+    accuracy_decimals: 0
+    icon: "mdi:axis-y-arrow"
+    state_class: "measurement"
+    
+  # Açı (derece)
+  - platform: template
+    name: "RD03D Angle"
+    id: rd03d_angle
+    unit_of_measurement: "°"
+    accuracy_decimals: 1
+    icon: "mdi:angle-acute"
+    state_class: "measurement"
+
+  # Hız (cm/s)
+  - platform: template
+    name: "RD03D Speed"
+    id: rd03d_speed
+    unit_of_measurement: "cm/s"
+    accuracy_decimals: 0
+    icon: "mdi:speedometer"
+    state_class: "measurement"
+
+  # WiFi sinyal gücü
+  - platform: wifi_signal
+    name: "RD03D WiFi Signal"
+    update_interval: 60s
+
+# İkili sensörler
+binary_sensor:
+  # Hedef algılama durumu
+  - platform: template
+    name: "RD03D Target Detected"
+    id: rd03d_target_detected
+    device_class: "occupancy"
+
+# Text sensör - durum bilgisi
+text_sensor:
+  - platform: template
+    name: "RD03D Status"
+    id: rd03d_status
+  
+  - platform: version
+    name: "RD03D ESPHome Version"
+
+# Custom component - UART'tan veri okuma
+interval:
+  - interval: 50ms
+    then:
+      - lambda: |-
+          static uint8_t rx_buffer[64] = {0};
+          static uint8_t rx_count = 0;
+          static uint32_t last_valid_data = 0;
+          
+          // UART'tan veri oku
+          while (id(uart_bus).available()) {
+            uint8_t byte;
+            id(uart_bus).read_byte(&byte);
+            
+            rx_buffer[rx_count++] = byte;
+            
+            // Buffer overflow kontrolü
+            if (rx_count >= 64) {
+              rx_count = 0;
+              memset(rx_buffer, 0, 64);
+              continue;
+            }
+            
+            // Frame sonu kontrolü: 0x55 0xCC
+            if (rx_count >= 2 && rx_buffer[rx_count - 2] == 0x55 && rx_buffer[rx_count - 1] == 0xCC) {
+              
+              // Frame uzunluğu kontrolü (32 byte olmalı)
+              if (rx_count >= 32) {
+                
+                // Header kontrolü: 0xAA 0xFF 0x03 0x00
+                if (rx_buffer[0] == 0xAA && rx_buffer[1] == 0xFF && 
+                    rx_buffer[2] == 0x03 && rx_buffer[3] == 0x00) {
+                  
+                  // Target1 verilerini parse et
+                  int16_t target_x = ((int16_t)(rx_buffer[4] | (rx_buffer[5] << 8))) - 0x200;
+                  int16_t target_y = ((int16_t)(rx_buffer[6] | (rx_buffer[7] << 8))) - 0x8000;
+                  int16_t target_speed = ((int16_t)(rx_buffer[8] | (rx_buffer[9] << 8))) - 0x10;
+                  uint16_t target_distance_res = rx_buffer[10] | (rx_buffer[11] << 8);
+                  
+                  // Mesafe hesapla (Pisagor teoremi)
+                  float distance = sqrt(pow(target_x, 2) + pow(target_y, 2)) / 10.0;
+                  
+                  // Açı hesapla (radyan -> derece)
+                  float angle = atan2(target_y, target_x) * 180.0 / 3.14159265;
+                  
+                  // Hedef algılandı mı kontrolü (mesafe > 0)
+                  bool target_detected = (distance > 0.5);
+                  
+                  // Sensörleri güncelle
+                  if (target_detected) {
+                    id(rd03d_distance).publish_state(distance);
+                    id(rd03d_x).publish_state(target_x);
+                    id(rd03d_y).publish_state(target_y);
+                    id(rd03d_angle).publish_state(angle);
+                    id(rd03d_speed).publish_state(target_speed);
+                    id(rd03d_target_detected).publish_state(true);
+                    id(rd03d_status).publish_state("Target Detected");
+                    last_valid_data = millis();
+                    
+                    // Debug log
+                    ESP_LOGD("RD03D", "Distance: %.1f cm, Angle: %.1f°, X: %d mm, Y: %d mm", 
+                             distance, angle, target_x, target_y);
+                  } else {
+                    id(rd03d_target_detected).publish_state(false);
+                    id(rd03d_status).publish_state("No Target");
+                  }
+                }
+              }
+              
+              // Buffer'ı sıfırla
+              rx_count = 0;
+              memset(rx_buffer, 0, 64);
+            }
+          }
+          
+          // 5 saniye veri gelmezse "hedef yok" durumu
+          if (millis() - last_valid_data > 5000 && last_valid_data > 0) {
+            id(rd03d_target_detected).publish_state(false);
+            id(rd03d_status).publish_state("No Data");
+          }
