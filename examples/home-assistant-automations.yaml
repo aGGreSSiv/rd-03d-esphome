@@ -1,0 +1,617 @@
+# Home Assistant Automation Examples
+
+Ready-to-use automation examples for RD-03D mmWave sensor integration.
+
+---
+
+## 📋 Table of Contents
+
+- [Basic Automations](#basic-automations)
+- [Distance-Based Control](#distance-based-control)
+- [Angle-Based Control](#angle-based-control)
+- [Advanced Automations](#advanced-automations)
+- [Multi-Zone Detection](#multi-zone-detection)
+- [Energy Saving](#energy-saving)
+
+---
+
+## Basic Automations
+
+### 1. Simple Light Control
+
+Turn light on when presence detected, off after 30 seconds of no motion.
+
+```yaml
+automation:
+  - alias: "Light ON - Motion Detected"
+    description: "Turn on light when person enters room"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        to: 'on'
+    action:
+      - service: light.turn_on
+        target:
+          entity_id: light.living_room
+
+  - alias: "Light OFF - No Motion"
+    description: "Turn off light after 30s of no motion"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        to: 'off'
+        for:
+          seconds: 30  # Wait 30 seconds before turning off
+    action:
+      - service: light.turn_off
+        target:
+          entity_id: light.living_room
+```
+
+---
+
+## Distance-Based Control
+
+### 2. Brightness by Distance
+
+Adjust light brightness based on distance - brighter when closer.
+
+```yaml
+automation:
+  - alias: "LED Brightness by Distance"
+    description: "Closer = brighter"
+    trigger:
+      - platform: state
+        entity_id: sensor.rd_03d_distance
+    condition:
+      - condition: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        state: 'on'
+    action:
+      - service: light.turn_on
+        target:
+          entity_id: light.living_room
+        data:
+          brightness: >
+            {% set distance = states('sensor.rd_03d_distance') | float(0) %}
+            {% set max_distance = 800 %}  {# 8 meters #}
+            {% set min_distance = 50 %}   {# 0.5 meters #}
+            
+            {# Calculate brightness: closer = brighter #}
+            {% set normalized = (max_distance - distance) / (max_distance - min_distance) %}
+            {% set brightness = (normalized * 255) | int %}
+            
+            {# Clamp between 10 and 255 #}
+            {{ [10, [brightness, 255] | min] | max }}
+```
+
+### 3. Fan Speed by Distance
+
+Control fan speed based on proximity.
+
+```yaml
+automation:
+  - alias: "Fan Speed by Distance"
+    description: "Closer = faster fan"
+    trigger:
+      - platform: state
+        entity_id: sensor.rd_03d_distance
+    condition:
+      - condition: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        state: 'on'
+    action:
+      - service: fan.set_percentage
+        target:
+          entity_id: fan.bedroom_fan
+        data:
+          percentage: >
+            {% set distance = states('sensor.rd_03d_distance') | float(0) %}
+            {% if distance < 200 %}
+              100  {# Very close: full speed #}
+            {% elif distance < 400 %}
+              66   {# Medium: 2/3 speed #}
+            {% elif distance < 600 %}
+              33   {# Far: 1/3 speed #}
+            {% else %}
+              0    {# Very far: off #}
+            {% endif %}
+```
+
+---
+
+## Angle-Based Control
+
+### 4. RGB Color by Angle
+
+Change LED color based on which side person is standing.
+
+```yaml
+automation:
+  - alias: "RGB Color by Angle"
+    description: "Left = blue, center = green, right = red"
+    trigger:
+      - platform: state
+        entity_id: sensor.rd_03d_angle
+    condition:
+      - condition: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        state: 'on'
+    action:
+      - service: light.turn_on
+        target:
+          entity_id: light.rgb_strip
+        data:
+          rgb_color: >
+            {% set angle = states('sensor.rd_03d_angle') | float(0) %}
+            {% if angle < -30 %}
+              [0, 0, 255]      {# Left: Blue #}
+            {% elif angle > 30 %}
+              [255, 0, 0]      {# Right: Red #}
+            {% else %}
+              [0, 255, 0]      {# Center: Green #}
+            {% endif %}
+```
+
+### 5. Curtain Control by Position
+
+Open/close curtains based on which side person approaches from.
+
+```yaml
+automation:
+  - alias: "Open Curtain Left"
+    description: "Person approaching from left"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.rd_03d_angle
+        below: -45
+    condition:
+      - condition: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        state: 'on'
+    action:
+      - service: cover.open_cover
+        target:
+          entity_id: cover.left_curtain
+
+  - alias: "Open Curtain Right"
+    description: "Person approaching from right"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.rd_03d_angle
+        above: 45
+    condition:
+      - condition: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        state: 'on'
+    action:
+      - service: cover.open_cover
+        target:
+          entity_id: cover.right_curtain
+```
+
+---
+
+## Advanced Automations
+
+### 6. Fade In/Out Effect
+
+Smooth light transitions when entering/leaving.
+
+```yaml
+automation:
+  - alias: "Light Fade In"
+    description: "Gradually turn on light"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        to: 'on'
+    action:
+      - service: light.turn_on
+        target:
+          entity_id: light.living_room
+        data:
+          brightness: 255
+          transition: 2  # 2 second fade in
+
+  - alias: "Light Fade Out"
+    description: "Gradually turn off light"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        to: 'off'
+        for:
+          seconds: 30
+    action:
+      - service: light.turn_on
+        target:
+          entity_id: light.living_room
+        data:
+          brightness: 0
+          transition: 5  # 5 second fade out
+      - delay:
+          seconds: 5
+      - service: light.turn_off
+        target:
+          entity_id: light.living_room
+```
+
+### 7. Speed-Based Detection
+
+Trigger different actions based on movement speed.
+
+```yaml
+automation:
+  - alias: "Fast Movement Alert"
+    description: "Alert on running/fast movement"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.rd_03d_speed
+        above: 100  # cm/s (about 3.6 km/h)
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "Fast Movement Detected"
+          message: "Someone is running in the room"
+
+  - alias: "Slow Movement - Night Light"
+    description: "Dim light for slow nighttime movement"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.rd_03d_speed
+        below: 30  # cm/s (slow movement)
+    condition:
+      - condition: state
+        entity_id: sun.sun
+        state: 'below_horizon'
+      - condition: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        state: 'on'
+    action:
+      - service: light.turn_on
+        target:
+          entity_id: light.bedroom
+        data:
+          brightness: 25  # Very dim
+          kelvin: 2700  # Warm color
+```
+
+---
+
+## Multi-Zone Detection
+
+### 8. Distance-Based Zones
+
+Define zones by distance and trigger different actions.
+
+```yaml
+automation:
+  - alias: "Zone 1 - Near (0-2m)"
+    description: "Person very close"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.rd_03d_distance
+        below: 200  # 2 meters in cm
+    condition:
+      - condition: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        state: 'on'
+    action:
+      - service: light.turn_on
+        target:
+          entity_id: light.zone1
+        data:
+          rgb_color: [255, 0, 0]  # Red
+
+  - alias: "Zone 2 - Medium (2-5m)"
+    description: "Person at medium distance"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.rd_03d_distance
+        above: 200
+        below: 500
+    condition:
+      - condition: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        state: 'on'
+    action:
+      - service: light.turn_on
+        target:
+          entity_id: light.zone2
+        data:
+          rgb_color: [255, 255, 0]  # Yellow
+
+  - alias: "Zone 3 - Far (5-8m)"
+    description: "Person far away"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.rd_03d_distance
+        above: 500
+    condition:
+      - condition: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        state: 'on'
+    action:
+      - service: light.turn_on
+        target:
+          entity_id: light.zone3
+        data:
+          rgb_color: [0, 255, 0]  # Green
+```
+
+---
+
+## Energy Saving
+
+### 9. Smart Thermostat Control
+
+Adjust temperature based on occupancy.
+
+```yaml
+automation:
+  - alias: "Occupied - Maintain Temperature"
+    description: "Person present, keep comfortable temp"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        to: 'on'
+    action:
+      - service: climate.set_temperature
+        target:
+          entity_id: climate.living_room
+        data:
+          temperature: 22  # Comfortable temperature
+
+  - alias: "Vacant - Energy Saving"
+    description: "No person for 5 min, reduce energy"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        to: 'off'
+        for:
+          minutes: 5
+    action:
+      - service: climate.set_temperature
+        target:
+          entity_id: climate.living_room
+        data:
+          temperature: 18  # Energy saving temperature
+```
+
+### 10. Smart TV Power Management
+
+Turn off TV when no one is in range.
+
+```yaml
+automation:
+  - alias: "TV Auto-Off"
+    description: "Turn off TV when room empty for 10 minutes"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        to: 'off'
+        for:
+          minutes: 10
+    condition:
+      - condition: state
+        entity_id: media_player.living_room_tv
+        state: 'on'
+    action:
+      - service: media_player.turn_off
+        target:
+          entity_id: media_player.living_room_tv
+      - service: notify.mobile_app
+        data:
+          title: "TV Auto-Off"
+          message: "TV turned off - no activity detected"
+```
+
+---
+
+## Notification Examples
+
+### 11. Presence Notifications
+
+Get notified when someone enters/leaves.
+
+```yaml
+automation:
+  - alias: "Notify Person Entered"
+    description: "Send notification when person detected"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        to: 'on'
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "Person Detected"
+          message: >
+            Person entered room at {{ now().strftime('%H:%M:%S') }}
+            Distance: {{ states('sensor.rd_03d_distance') }} cm
+            Angle: {{ states('sensor.rd_03d_angle') }}°
+
+  - alias: "Notify Person Left"
+    description: "Send notification when person leaves"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        to: 'off'
+        for:
+          seconds: 30
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "Person Left"
+          message: "No presence detected for 30 seconds"
+```
+
+---
+
+## Tips and Best Practices
+
+### Avoid False Triggers
+
+```yaml
+# Always add delays for "off" triggers
+- platform: state
+  to: 'off'
+  for:
+    seconds: 30  # Recommended minimum
+
+# For lights, use longer delays
+- platform: state
+  to: 'off'
+  for:
+    minutes: 2  # Better for lights
+```
+
+### Use Conditions
+
+```yaml
+# Only trigger during certain times
+condition:
+  - condition: time
+    after: '06:00:00'
+    before: '23:00:00'
+
+# Only when dark
+condition:
+  - condition: numeric_state
+    entity_id: sensor.illuminance
+    below: 50
+
+# Only on weekdays
+condition:
+  - condition: time
+    weekday:
+      - mon
+      - tue
+      - wed
+      - thu
+      - fri
+```
+
+### Combine Multiple Triggers
+
+```yaml
+automation:
+  - alias: "Smart Night Light"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        to: 'on'
+    condition:
+      - condition: state
+        entity_id: sun.sun
+        state: 'below_horizon'
+      - condition: numeric_state
+        entity_id: sensor.rd_03d_speed
+        below: 50  # Slow movement
+    action:
+      - service: light.turn_on
+        target:
+          entity_id: light.night_light
+        data:
+          brightness: 20
+          kelvin: 2700
+```
+
+---
+
+## Debugging Automations
+
+### Add Logging
+
+```yaml
+action:
+  - service: system_log.write
+    data:
+      message: >
+        Automation triggered: 
+        Distance={{ states('sensor.rd_03d_distance') }}
+        Angle={{ states('sensor.rd_03d_angle') }}
+      level: info
+  - service: light.turn_on  # Your actual action
+    ...
+```
+
+### Test Mode
+
+```yaml
+# Set automation to manual mode first
+mode: single  # or restart, queued, parallel
+
+# Add a notification to test
+action:
+  - service: notify.mobile_app
+    data:
+      title: "Test"
+      message: "Automation triggered!"
+  # Then add your real actions
+```
+
+---
+
+## Integration with Other Sensors
+
+### Combine with Light Sensor
+
+```yaml
+automation:
+  - alias: "Smart Auto-Light"
+    description: "Only turn on if dark + person present"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        to: 'on'
+    condition:
+      - condition: numeric_state
+        entity_id: sensor.illuminance
+        below: 50  # Only if dark
+    action:
+      - service: light.turn_on
+        target:
+          entity_id: light.living_room
+```
+
+### Combine with Door Sensor
+
+```yaml
+automation:
+  - alias: "Security Alert"
+    description: "Motion detected with door closed"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.rd_03d_target_detected
+        to: 'on'
+    condition:
+      - condition: state
+        entity_id: binary_sensor.door
+        state: 'off'  # Door closed
+      - condition: state
+        entity_id: alarm_control_panel.home
+        state: 'armed_away'
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "⚠️ Security Alert"
+          message: "Motion detected while away!"
+```
+
+---
+
+## Contributing
+
+Have a cool automation? Share it:
+
+1. Test thoroughly
+2. Document conditions and triggers
+3. Submit as pull request
+4. Include description and use case
+
+---
+
+**More examples coming soon!** Check [GitHub Discussions](https://github.com/yourusername/rd-03d-esphome/discussions) for community automations.
+
+[⬆ Back to Top](#home-assistant-automation-examples)
