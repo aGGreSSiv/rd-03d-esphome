@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RD-03D Coverage Analysis - 7m × 10m Room</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #718096;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+        }
+
+        .warning-box h3 {
+            color: #856404;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        .warning-box p {
+            color: #856404;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        svg {
+            width: 100%;
+            height: auto;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            background: #f8f9fa;
+            margin-bottom: 30px;
+        }
+
+        .legend {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: #f7fafc;
+            border-radius: 8px;
+            transition: transform 0.2s;
+        }
+
+        .legend-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .legend-color {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: 2px solid #2d3748;
+            flex-shrink: 0;
+        }
+
+        .legend-text {
+            flex: 1;
+        }
+
+        .legend-text strong {
+            display: block;
+            color: #2d3748;
+            margin-bottom: 4px;
+        }
+
+        .legend-text small {
+            color: #718096;
+            font-size: 13px;
+        }
+
+        .stats-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stats-section h3 {
+            margin-bottom: 20px;
+            font-size: 22px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-label {
+            font-size: 13px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .info-section {
+            background: #f7fafc;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .info-section h3 {
+            color: #2d3748;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .info-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .info-card h4 {
+            color: #2d3748;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        .info-card ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .info-card li {
+            color: #4a5568;
+            padding: 5px 0;
+            font-size: 14px;
+        }
+
+        .info-card li::before {
+            content: "✓ ";
+            color: #48bb78;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .alert-section {
+            background: #fff5f5;
+            border: 2px solid #fc8181;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .alert-section h3 {
+            color: #c53030;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alert-list {
+            color: #742a2a;
+            line-height: 1.8;
+        }
+
+        .solution-section {
+            background: #f0fff4;
+            border: 2px solid #68d391;
+            padding: 20px;
+            border-radius: 12px;
+        }
+
+        .solution-section h3 {
+            color: #22543d;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .solution-grid {
+            display: grid;
+            gap: 15px;
+        }
+
+        .solution-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #48bb78;
+        }
+
+        .solution-card h4 {
+            color: #22543d;
+            margin-bottom: 8px;
+        }
+
+        .solution-card .pros {
+            color: #22543d;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .solution-card .cons {
+            color: #744210;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-top: 8px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #e2e8f0;
+            color: #718096;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 22px;
+            }
+
+            .stat-grid, .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .coverage-excellent { color: #22c55e; }
+        .coverage-good { color: #84cc16; }
+        .coverage-fair { color: #fbbf24; }
+        .coverage-poor { color: #ef4444; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 RD-03D Coverage Analysis</h1>
+        <div class="subtitle">7m × 10m Room - Sensor Centered on Short Wall</div>
+
+        <div class="warning-box">
+            <h3>⚠️ Important Finding</h3>
+            <p>With sensor placed at center of the 7m short wall, <strong>approximately 20% of the room</strong> (14 m²) will be outside detection range. The far corners at 10.3m exceed the sensor's 8m maximum range.</p>
+        </div>
+        
+        <svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+            <!-- Definitions -->
+            <defs>
+                <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnits">
+                    <rect width="50" height="50" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+                </pattern>
+                
+                <filter id="shadow">
+                    <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+                </filter>
+                
+                <radialGradient id="coverageGradient" cx="50%" cy="100%">
+                    <stop offset="0%" style="stop-color:#4ade80;stop-opacity:0.7" />
+                    <stop offset="70%" style="stop-color:#22c55e;stop-opacity:0.5" />
+                    <stop offset="100%" style="stop-color:#16a34a;stop-opacity:0.2" />
+                </radialGradient>
+
+                <linearGradient id="sensorGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#ef4444;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#dc2626;stop-opacity:1" />
+                </linearGradient>
+            </defs>
+            
+            <!-- Background grid -->
+            <rect width="800" height="600" fill="url(#grid)"/>
+            
+            <!-- Room dimensions: 7m × 10m, Scale: 50px = 1m -->
+            <g transform="translate(225, 50)">
+                <!-- Room outline (7m width × 10m depth) -->
+                <rect x="0" y="0" width="350" height="500" 
+                      fill="#f5f5f5" stroke="#2d3748" stroke-width="3" 
+                      stroke-dasharray="10,5" rx="5"/>
+                
+                <!-- Wall labels -->
+                <text x="175" y="-15" text-anchor="middle" font-size="16" fill="#2d3748" font-weight="bold">
+                    7 meters (Short Wall)
+                </text>
+                <text x="-50" y="250" text-anchor="middle" font-size="16" fill="#2d3748" font-weight="bold" 
+                      transform="rotate(-90 -50 250)">
+                    10 meters
+                </text>
+                
+                <!-- Sensor position (centered on short wall, near bottom) -->
+                <g id="sensor" transform="translate(175, 480)">
+                    <!-- 8m max range circle -->
+                    <circle cx="0" cy="0" r="400" fill="none" stroke="#ef4444" 
+                            stroke-width="2" stroke-dasharray="5,5" opacity="0.5"/>
+                    <text x="0" y="-410" text-anchor="middle" font-size="14" fill="#ef4444" font-weight="bold">
+                        8m Maximum Range
+                    </text>
+                    
+                    <!-- Coverage area (120° = ±60°) -->
+                    <path d="M 0 0 
+                             L -346.4 -200 
+                             A 400 400 0 0 1 346.4 -200 
+                             Z" 
+                          fill="url(#coverageGradient)" 
+                          stroke="#22c55e" 
+                          stroke-width="3"
+                          opacity="0.8"/>
+                    
+                    <!-- Coverage boundary lines -->
+                    <line x1="0" y1="0" x2="-346.4" y2="-200" stroke="#22c55e" stroke-width="2" stroke-dasharray="5,3"/>
+                    <line x1="0" y1="0" x2="346.4" y2="-200" stroke="#22c55e" stroke-width="2" stroke-dasharray="5,3"/>
+                    
+                    <!-- Angle indicators -->
+                    <text x="-290" y="-150" font-size="14" fill="#22c55e" font-weight="bold">60°</text>
+                    <text x="290" y="-150" font-size="14" fill="#22c55e" font-weight="bold">60°</text>
+                    
+                    <!-- Sensor icon -->
+                    <circle cx="0" cy="0" r="18" fill="url(#sensorGradient)" filter="url(#shadow)"/>
+                    <circle cx="0" cy="0" r="12" fill="#dc2626"/>
+                    <circle cx="0" cy="0" r="6" fill="#fff"/>
+                    
+                    <!-- Radar wave animation -->
+                    <circle cx="0" cy="0" r="25" fill="none" stroke="#ef4444" 
+                            stroke-width="2" opacity="0.6">
+                        <animate attributeName="r" from="25" to="50" dur="2s" 
+                                 repeatCount="indefinite"/>
+                        <animate attributeName="opacity" from="0.6" to="0" dur="2s" 
+                                 repeatCount="indefinite"/>
+                    </circle>
+                </g>
+                
+                <!-- Blind spots (corners) -->
+                <g id="blind-spots">
+                    <!-- Top left corner -->
+                    <rect x="0" y="0" width="70" height="90" fill="#ef4444" opacity="0.35" rx="5"/>
+                    <text x="35" y="50" text-anchor="middle" font-size="12" fill="#dc2626" 
+                          font-weight="bold">BLIND</text>
+                    <text x="35" y="65" text-anchor="middle" font-size="10" fill="#dc2626">
+                        ~10.3m
+                    </text>
+                    
+                    <!-- Top right corner -->
+                    <rect x="280" y="0" width="70" height="90" fill="#ef4444" opacity="0.35" rx="5"/>
+                    <text x="315" y="50" text-anchor="middle" font-size="12" fill="#dc2626" 
+                          font-weight="bold">BLIND</text>
+                    <text x="315" y="65" text-anchor="middle" font-size="10" fill="#dc2626">
+                        ~10.3m
+                    </text>
+                </g>
+                
+                <!-- Distance markers -->
+                <g id="distance-markers">
+                    <!-- 2m line -->
+                    <line x1="0" y1="380" x2="350" y2="380" 
+                          stroke="#3b82f6" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>
+                    <text x="360" y="385" font-size="11" fill="#3b82f6">2m</text>
+                    
+                    <!-- 4m line -->
+                    <line x1="0" y1="280" x2="350" y2="280" 
+                          stroke="#3b82f6" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>
+                    <text x="360" y="285" font-size="11" fill="#3b82f6">4m</text>
+                    
+                    <!-- 6m line -->
+                    <line x1="0" y1="180" x2="350" y2="180" 
+                          stroke="#3b82f6" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>
+                    <text x="360" y="185" font-size="11" fill="#3b82f6">6m</text>
+                    
+                    <!-- 8m max line -->
+                    <line x1="0" y1="80" x2="350" y2="80" 
+                          stroke="#ef4444" stroke-width="2" stroke-dasharray="5,3" opacity="0.7"/>
+                    <text x="360" y="85" font-size="12" fill="#ef4444" font-weight="bold">8m</text>
+                </g>
+                
+                <!-- Coverage zones with labels -->
+                <g id="coverage-zones">
+                    <!-- Excellent coverage (0-4m) -->
+                    <text x="175" y="380" text-anchor="middle" font-size="15" 
+                          fill="#22c55e" font-weight="bold">
+                        ✓ EXCELLENT COVERAGE
+                    </text>
+                    
+                    <!-- Good coverage (4-6m) -->
+                    <text x="175" y="230" text-anchor="middle" font-size="14" 
+                          fill="#84cc16" font-weight="bold">
+                        ✓ GOOD COVERAGE
+                    </text>
+                    
+                    <!-- Fair coverage (6-8m) -->
+                    <text x="175" y="130" text-anchor="middle" font-size="13" 
+                          fill="#fbbf24" font-weight="bold">
+                        ⚠ FAIR COVERAGE
+                    </text>
+                    
+                    <!-- No coverage (>8m) -->
+                    <text x="175" y="45" text-anchor="middle" font-size="13" 
+                          fill="#ef4444" font-weight="bold">
+                        ✗ OUT OF RANGE
+                    </text>
+                </g>
+            </g>
+        </svg>
+        
+        <!-- Legend -->
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%); opacity: 0.7;"></div>
+                <div class="legend-text">
+                    <strong>Coverage Area</strong>
+                    <small>±60° angle, 8m maximum</small>
+                </div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #ef4444; opacity: 0.35;"></div>
+                <div class="legend-text">
+                    <strong>Blind Spots</strong>
+                    <small>Corners beyond 8m range</small>
+                </div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);"></div>
+                <div class="legend-text">
+                    <strong>Sensor Position</strong>
+                    <small>Centered on short wall</small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Statistics -->
+        <div class="stats-section">
+            <h3>📊 Coverage Statistics</h3>
+            
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Room Area</div>
+                    <div class="stat-value">70 m²</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Covered Area</div>
+                    <div class="stat-value coverage-excellent">~56 m²</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Blind Spots</div>
+                    <div class="stat-value coverage-poor">~14 m²</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Coverage Rate</div>
+                    <div class="stat-value coverage-good">80%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Measurements -->
+        <div class="info-section">
+            <h3>📏 Key Distance Measurements</h3>
+            
+            <div class="info-grid">
+                <div class="info-card">
+                    <h4 class="coverage-excellent">✓ Within Range</h4>
+                    <ul>
+                        <li>Side walls center: 6.1m</li>
+                        <li>First 6m depth: Full coverage</li>
+                        <li>All lateral areas: Covered</li>
+                    </ul>
+                </div>
+                <div class="info-card">
+                    <h4 class="coverage-fair">⚠ Borderline</h4>
+                    <ul>
+                        <li>Opposite wall center: 9.5m</li>
+                        <li>6-8m zone: Intermittent</li>
+                        <li>May miss occasionally</li>
+                    </ul>
+                </div>
+                <div class="info-card">
+                    <h4 class="coverage-poor">✗ Out of Range</h4>
+                    <ul>
+                        <li>Far corners: 10.3m</li>
+                        <li>Beyond 8m: No detection</li>
+                        <li>20% of room affected</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Problem Analysis -->
+        <div class="alert-section">
+            <h3>⚠️ Coverage Issues</h3>
+            <div class="alert-list">
+                <strong>Current Setup Problems:</strong>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li style="margin: 8px 0;">Opposite wall center at 9.5m exceeds 8m maximum range</li>
+                    <li style="margin: 8px 0;">Both far corners at 10.3m completely out of range</li>
+                    <li style="margin: 8px 0;">Approximately 14 m² (20%) in blind zones</li>
+                    <li style="margin: 8px 0;">Critical areas may not be monitored effectively</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Solutions -->
+        <div class="solution-section">
+            <h3>💡 Recommended Solutions</h3>
+            
+            <div class="solution-grid">
+                <div class="solution-card">
+                    <h4>Option 1: Move Sensor Forward (2m)</h4>
+                    <div class="pros">
+                        <strong>✓ Pros:</strong> Opposite wall becomes 8m (within range), easier installation, no additional cost
+                    </div>
+                    <div class="cons">
+                        <strong>⚠ Cons:</strong> Creates 2m blind spot behind sensor, corners still at 8.7m (borderline)
+                    </div>
+                </div>
+
+                <div class="solution-card">
+                    <h4>Option 2: Mount on Long Wall ⭐ Best</h4>
+                    <div class="pros">
+                        <strong>✓ Pros:</strong> All areas within 8.6m, better coverage (~95%), more balanced detection
+                    </div>
+                    <div class="cons">
+                        <strong>⚠ Cons:</strong> Longer cable run required, different mounting location
+                    </div>
+                </div>
+
+                <div class="solution-card">
+                    <h4>Option 3: Ceiling Mount (Center)</h4>
+                    <div class="pros">
+                        <strong>✓ Pros:</strong> 100% coverage achievable, maximum 6.4m distance, optimal viewing angle
+                    </div>
+                    <div class="cons">
+                        <strong>⚠ Cons:</strong> Ceiling installation required, cable management more complex
+                    </div>
+                </div>
+
+                <div class="solution-card">
+                    <h4>Option 4: Dual Sensor Setup</h4>
+                    <div class="pros">
+                        <strong>✓ Pros:</strong> Complete coverage guaranteed, redundancy, more precise tracking
+                    </div>
+                    <div class="cons">
+                        <strong>⚠ Cons:</strong> Double cost, requires two ESP32 units, more complex setup
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Technical Details -->
+        <div class="info-section">
+            <h3>🔬 Technical Specifications</h3>
+            
+            <div class="info-grid">
+                <div class="info-card">
+                    <h4>Detection Range</h4>
+                    <ul>
+                        <li>Maximum: 8 meters</li>
+                        <li>Minimum: ~0.6 meters</li>
+                        <li>Optimal: 0-6 meters</li>
+                        <li>Resolution: 0.75m</li>
+                    </ul>
+                </div>
+                <div class="info-card">
+                    <h4>Detection Angle</h4>
+                    <ul>
+                        <li>Horizontal: ±60° (120° total)</li>
+                        <li>Vertical: ±30° (60° total)</li>
+                        <li>Wide side coverage</li>
+                        <li>Limited depth reach</li>
+                    </ul>
+                </div>
+                <div class="info-card">
+                    <h4>Mounting Guidelines</h4>
+                    <ul>
+                        <li>Height: 1.5-2.0 meters</li>
+                        <li>Logo facing up</li>
+                        <li>Clear line of sight</li>
+                        <li>Away from metal objects</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>RD-03D mmWave Radar Coverage Analysis</strong></p>
+            <p>Generated for ESPHome Integration Project</p>
+            <p style="margin-top: 10px;">Made with ❤️ for the Home Assistant Community</p>
+        </div>
+    </div>
+</body>
+</html>
